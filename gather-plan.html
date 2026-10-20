@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>모임 순서표 · Gather Plan</title>
+<style>
+:root{--bg:#f4f5f1;--card:#fff;--ink:#203830;--muted:#66766d;--line:#dce3dc;--accent:#25654e;--warn:#a43b25}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1160px;margin:auto;padding:40px 24px 70px}
+header{display:flex;justify-content:space-between;align-items:center;gap:20px}
+h1{font-size:32px;letter-spacing:-1px;margin:3px 0}
+h2{font-size:18px;margin:0 0 12px}
+p{margin:4px 0;color:var(--muted)}
+small,.eyebrow{color:var(--muted)}
+.eyebrow{font-size:12px;letter-spacing:2px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;margin-top:20px}
+.settings{display:grid;grid-template-columns:2fr 1fr 1fr;gap:16px}
+label{display:block;font-size:13px;color:var(--muted)}
+input,textarea,button{font:inherit}
+input,textarea{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:8px;background:white;color:var(--ink)}
+input:focus,textarea:focus{outline:2px solid #9bc4af;outline-offset:1px}
+textarea{resize:vertical;min-height:48px}
+button{cursor:pointer;border:1px solid var(--line);border-radius:8px;padding:9px 13px;background:white;color:var(--ink)}
+button:hover{background:#edf3ee}
+button:disabled{opacity:.35;cursor:default}
+.primary{background:var(--accent);color:white;border-color:var(--accent)}
+.primary:hover{background:#194d3a}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.summary{display:flex;gap:28px;flex-wrap:wrap}
+.stat strong{display:block;font-size:25px}
+.warning{color:var(--warn)}
+.table-wrap{overflow:auto}
+table{width:100%;border-collapse:collapse;min-width:850px}
+th{text-align:left;color:var(--muted);font-size:12px;font-weight:500}
+th,td{padding:12px 7px;border-bottom:1px solid var(--line);vertical-align:top}
+td.time{white-space:nowrap;font-variant-numeric:tabular-nums;font-size:13px;padding-top:23px}
+td input,td textarea{font-size:14px}
+td .minutes{width:76px}
+.row-actions{display:flex;gap:4px;padding-top:3px}
+.row-actions button{padding:6px 9px}
+.materials{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0;margin:0}
+.materials li{background:#eef3ed;padding:7px 13px;border-radius:8px}
+#status{min-height:25px;margin-top:12px;font-size:13px}
+.footer{margin-top:24px;font-size:12px}
+.print-only{display:none}
+@media(max-width:700px){
+main{padding:24px 14px}header{align-items:flex-start;flex-direction:column}
+.settings{grid-template-columns:1fr 1fr}.settings label:first-child{grid-column:1/-1}
+.panel{padding:16px}h1{font-size:28px}}
+@media print{
+body{background:white;color:black;font-size:11pt}main{padding:0;max-width:none}
+.no-print,.settings,.editor{display:none!important}.print-only{display:block}
+header{display:block}.panel{border:0;padding:0;margin-top:22px;break-inside:avoid}
+table{min-width:0;font-size:10pt}th,td{padding:7px 5px}
+.summary{gap:25px}.stat strong{font-size:17pt}
+.materials li{background:none;border:1px solid #ccc}.footer{display:none}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<div><div class="eyebrow">GATHER PLAN</div><h1 id="heading">모임 순서표</h1>
+<p>진행 시간과 준비물을 한 장으로 정리하세요.</p></div>
+<button class="primary no-print" id="add">＋ 순서 추가</button>
+</header>
+<section class="panel settings">
+<label>행사 이름<input id="title" maxlength="120" placeholder="예: 청년부 가을 모임"></label>
+<label>시작 시각<input id="start" type="time" required></label>
+<label>목표 종료 시각<input id="deadline" type="time"></label>
+</section>
+<section class="panel"><div class="summary">
+<div class="stat"><small>전체 순서</small><strong id="count"></strong></div>
+<div class="stat"><small>총 소요 시간</small><strong id="duration"></strong></div>
+<div class="stat"><small>예상 종료</small><strong id="finish"></strong></div>
+<div class="stat"><small>목표 대비</small><strong id="difference"></strong></div>
+</div></section>
+<section class="panel editor">
+<h2>진행 순서</h2>
+<p><small>준비물은 쉼표 또는 줄바꿈으로 구분하세요. 시간은 1~1,440분으로 입력할 수 있습니다.</small></p>
+<div class="table-wrap"><table><thead><tr>
+<th style="width:125px">진행 시각</th><th>순서 이름</th>
+<th style="width:90px">시간(분)</th><th style="width:130px">담당자</th>
+<th>준비물</th><th style="width:120px">이동·삭제</th>
+</tr></thead><tbody id="rows"></tbody></table></div>
+</section>
+<section class="panel print-only"><h2>진행 순서</h2>
+<table><thead><tr><th>시각</th><th>순서</th><th>분</th><th>담당자</th><th>준비물</th></tr></thead>
+<tbody id="printRows"></tbody></table></section>
+<section class="panel"><h2>전체 준비물</h2><ul class="materials" id="materials"></ul>
+<p><small>같은 이름은 한 번만 표시합니다. 수량은 별도로 확인하세요.</small></p></section>
+<section class="panel no-print"><h2>저장과 공유</h2>
+<p>JSON은 나중에 이어서 수정할 때, CSV는 엑셀에서 열 때 사용하세요.</p>
+<div class="actions">
+<button id="saveJson">작업 파일 저장</button><button id="loadJson">작업 파일 불러오기</button>
+<button id="csv">CSV 저장</button><button id="print">인쇄 / PDF 저장</button>
+<button id="sample">예제 불러오기</button></div>
+<input id="file" type="file" accept=".json,application/json" hidden>
+<p id="status" role="status" aria-live="polite"></p></section>
+<p class="footer">입력한 내용은 서버로 전송하지 않습니다.
+브라우저 임시 저장은 환경에 따라 지워질 수 있습니다. 중요한 작업은 파일로도 저장하세요.</p>
+</main>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const STORAGE = "gather-plan-v1";
+const MAX_ROWS = 200;
+let autosaveFailed = false;
+const example = () => ({
+ version:1,title:"청년부 가을 모임",start:"14:00",deadline:"16:00",
+ items:[
+  {name:"환영과 안내",minutes:10,owner:"진행자",materials:"마이크"},
+  {name:"아이스브레이크",minutes:20,owner:"레크리에이션팀",materials:"이름표, 펜, 타이머"},
+  {name:"팀별 활동",minutes:35,owner:"팀장",materials:"활동지, 펜"},
+  {name:"휴식",minutes:10,owner:"",materials:"물, 간식"},
+  {name:"나눔과 마무리",minutes:25,owner:"진행자",materials:"마이크"}
+ ]});
+function validTime(s){
+ return typeof s==="string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
+}
+function validate(p){
+ if(!p || p.version!==1 || typeof p.title!=="string" ||
+ p.title.length>120 || !validTime(p.start) ||
+ !(p.deadline==="" || validTime(p.deadline)) ||
+ !Array.isArray(p.items) || p.items.length>MAX_ROWS)
+  throw Error("지원하지 않는 작업 파일입니다.");
+ const items=p.items.map(x=>{
+  if(!x || !Number.isInteger(x.minutes) || x.minutes<1 || x.minutes>1440 ||
+  !["name","owner","materials"].every(k=>typeof x[k]==="string" && x[k].length<=2000))
+   throw Error("순서 내용이나 소요 시간을 확인해 주세요.");
+  return {name:x.name,minutes:x.minutes,owner:x.owner,materials:x.materials};
+ });
+ return {version:1,title:p.title,start:p.start,deadline:p.deadline,items};
+}
+let plan=example();
+let initialNotice="";
+try{
+ const saved=localStorage.getItem(STORAGE);
+ if(saved) plan=validate(JSON.parse(saved));
+}catch(e){
+ initialNotice="이전 임시 저장을 읽지 못했습니다. 필요한 작업 파일을 불러오세요.";
+}
+function message(s,error=false){
+ $("status").textContent=s;
+ $("status").classList.toggle("warning",error);
+}
+function persist(){
+ try{
+  localStorage.setItem(STORAGE,JSON.stringify(plan));
+  if(autosaveFailed) message("브라우저 임시 저장이 다시 작동합니다.");
+  autosaveFailed=false;
+ }catch(e){
+  autosaveFailed=true;
+  message("브라우저 임시 저장을 사용할 수 없습니다. 작업 파일을 저장하세요.",true);
+ }
+}
+function minuteOf(s){
+ const [h,m]=s.split(":").map(Number);return h*60+m;
+}
+function clock(n){
+ const day=Math.floor(n/1440),v=n%1440;
+ return (day ? "+"+day+"일 ":"")+
+ String(Math.floor(v/60)).padStart(2,"0")+":"+String(v%60).padStart(2,"0");
+}
+function materialList(s){
+ return s.split(/[,，\n]+/).map(x=>x.trim()).filter(Boolean);
+}
+function schedule(){
+ let cursor=minuteOf(plan.start);
+ return plan.items.map(item=>{
+  const start=cursor;cursor+=item.minutes;return {...item,start,end:cursor};
+ });
+}
+function cell(tr,text){
+ const td=document.createElement("td");td.textContent=text;tr.append(td);return td;
+}
+function inputCell(tr,item,key,type="text"){
+ const td=document.createElement("td");
+ const el=document.createElement(key==="materials"?"textarea":"input");
+ if(el.tagName==="INPUT") el.type=type;
+ el.value=item[key];
+ el.setAttribute("aria-label",
+ ({name:"순서 이름",minutes:"소요 시간",owner:"담당자",materials:"준비물"})[key]);
+ if(key==="minutes"){
+  el.min="1";el.max="1440";el.step="1";el.className="minutes";
+ }else el.maxLength=2000;
+ el.addEventListener("input",()=>{
+  if(key==="minutes"){
+   const n=Number(el.value);
+   const valid=el.value!=="" && Number.isInteger(n) && n>=1 && n<=1440;
+   el.setCustomValidity(valid?"":"1~1,440 사이의 정수를 입력하세요.");
+   if(!valid){
+    message("시간은 1~1,440분 사이의 정수로 입력하세요.",true);return;
+   }
+   item[key]=n;
+  }else item[key]=el.value;
+  message("변경했습니다. 중요한 작업은 파일로도 저장하세요.");
+  refreshComputed();persist();
+ });
+ td.append(el);tr.append(td);
+}
+function render(){
+ $("title").value=plan.title;$("start").value=plan.start;
+ $("deadline").value=plan.deadline;$("rows").replaceChildren();
+ plan.items.forEach((item,i)=>{
+  const tr=document.createElement("tr");
+  const time=cell(tr,"");time.className="time";time.dataset.timeIndex=String(i);
+  inputCell(tr,item,"name");inputCell(tr,item,"minutes","number");
+  inputCell(tr,item,"owner");inputCell(tr,item,"materials");
+  const td=document.createElement("td"),group=document.createElement("div");
+  group.className="row-actions";
+  [["↑","위로 이동",-1],["↓","아래로 이동",1],["×","삭제",0]].forEach(entry=>{
+   const [symbol,label,delta]=entry,button=document.createElement("button");
+   button.textContent=symbol;
+   button.setAttribute("aria-label",(i+1)+"번 순서 "+label);
+   button.disabled=delta!==0 && (i+delta<0 || i+delta>=plan.items.length);
+   button.onclick=()=>{
+    if(!allValid())return;
+    if(delta===0){
+     if(!confirm('"'+(item.name||"이름 없는 순서")+'"를 삭제할까요?'))return;
+     plan.items.splice(i,1);
+    }else [plan.items[i],plan.items[i+delta]]=[plan.items[i+delta],plan.items[i]];
+    render();persist();
+   };
+   group.append(button);
+  });
+  td.append(group);tr.append(td);$("rows").append(tr);
+ });
+ refreshComputed();
+}
+function refreshComputed(){
+ const list=schedule(),total=plan.items.reduce((n,x)=>n+x.minutes,0);
+ const end=minuteOf(plan.start)+total;
+ $("heading").textContent=plan.title.trim()||"모임 순서표";
+ $("count").textContent=plan.items.length+"개";
+ $("duration").textContent=total+"분";$("finish").textContent=clock(end);
+ const diff=$("difference");diff.classList.remove("warning");
+ if(!plan.deadline)diff.textContent="목표 미설정";
+ else{
+  let target=minuteOf(plan.deadline);
+  if(target<minuteOf(plan.start))target+=1440;
+  const d=end-target;
+  diff.textContent=d>0?d+"분 초과":d<0?(-d)+"분 여유":"정시 종료";
+  diff.classList.toggle("warning",d>0);
+ }
+ document.querySelectorAll("[data-time-index]").forEach(td=>{
+  const r=list[Number(td.dataset.timeIndex)];
+  td.textContent=clock(r.start)+" – "+clock(r.end);
+ });
+ $("printRows").replaceChildren();
+ list.forEach(r=>{
+  const tr=document.createElement("tr");
+  [clock(r.start)+" – "+clock(r.end),r.name,r.minutes,r.owner,r.materials]
+   .forEach(v=>cell(tr,String(v)));
+  $("printRows").append(tr);
+ });
+ const unique=new Set(plan.items.flatMap(x=>materialList(x.materials)));
+ $("materials").replaceChildren();
+ (unique.size?[...unique]:["등록된 준비물이 없습니다."]).forEach(text=>{
+  const li=document.createElement("li");li.textContent=text;$("materials").append(li);
+ });
+}
+function allValid(){
+ for(const el of document.querySelectorAll("input:not([type=file]),textarea")){
+  if(!el.reportValidity())return false;
+ }
+ return true;
+}
+function download(content,name,type){
+ const url=URL.createObjectURL(new Blob([content],{type}));
+ const a=document.createElement("a");
+ a.href=url;a.download=name;document.body.append(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
+function csvValue(value){
+ let s=String(value).replace(/\r\n?/g,"\n");
+ // Guard against spreadsheet formulas in user-provided text.
+ if(/^[\s]*[=+\-@]/.test(s))s="'"+s;
+ return '"'+s.replace(/"/g,'""')+'"';
+}
+$("title").oninput=e=>{
+ plan.title=e.target.value;refreshComputed();persist();
+};
+$("start").oninput=e=>{
+ if(!validTime(e.target.value))return;
+ plan.start=e.target.value;refreshComputed();persist();
+};
+$("deadline").oninput=e=>{
+ if(e.target.value!==""&&!validTime(e.target.value))return;
+ plan.deadline=e.target.value;refreshComputed();persist();
+};
+$("add").onclick=()=>{
+ if(!allValid())return;
+ if(plan.items.length>=MAX_ROWS){
+  message("순서는 최대 200개까지 추가할 수 있습니다.",true);return;
+ }
+ plan.items.push({name:"새 순서",minutes:10,owner:"",materials:""});
+ render();persist();
+ const fields=$("rows").lastElementChild.querySelectorAll("input");
+ fields[0].focus();fields[0].select();
+};
+$("saveJson").onclick=()=>{
+ if(!allValid())return;
+ download(JSON.stringify(plan,null,2),"gather-plan.json","application/json");
+ message("작업 파일을 저장했습니다.");
+};
+$("loadJson").onclick=()=>{
+ if(!allValid())return;
+ if(confirm("현재 내용을 불러온 파일로 바꿀까요? 필요하면 먼저 저장하세요."))
+  $("file").click();
+};
+$("file").onchange=async e=>{
+ const f=e.target.files[0];if(!f)return;
+ try{
+  if(f.size>2*1024*1024)throw Error("2MB 이하의 JSON 파일을 선택하세요.");
+  const next=validate(JSON.parse(await f.text()));
+  plan=next;render();persist();
+  if(!autosaveFailed)message("작업 파일을 불러왔습니다.");
+ }catch(err){message(err.message||"파일을 읽지 못했습니다.",true);}
+ finally{e.target.value="";}
+};
+$("csv").onclick=()=>{
+ if(!allValid())return;
+ const rows=[["행사",plan.title],
+ ["시작","종료","순서","소요 시간(분)","담당자","준비물"],
+ ...schedule().map(r=>[
+  clock(r.start),clock(r.end),r.name,r.minutes,r.owner,r.materials])];
+ download("\uFEFF"+rows.map(r=>r.map(csvValue).join(",")).join("\r\n"),
+ "gather-plan.csv","text/csv;charset=utf-8");
+ message("CSV 파일을 저장했습니다.");
+};
+$("print").onclick=()=>{if(allValid()){refreshComputed();window.print();}};
+$("sample").onclick=()=>{
+ if(!allValid())return;
+ if(!confirm("현재 내용을 예제로 바꿀까요? 필요하면 먼저 저장하세요."))return;
+ plan=example();render();persist();
+ if(!autosaveFailed)message("예제를 불러왔습니다.");
+};
+window.addEventListener("beforeprint",refreshComputed);
+render();
+if(initialNotice)message(initialNotice,true);
+</script>
+</body>
+</html>
